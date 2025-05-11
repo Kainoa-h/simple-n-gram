@@ -41,11 +41,11 @@ impl Default for Config {
 
 trait Model {
   fn train(&mut self, corpus: Vec<String>) -> Result<(), String>;
-  
+
   fn predict(&mut self);
-  
+
   fn get_lower_case_config(&self) -> bool;
-  
+
   fn tokenize(&mut self, sentence: String) -> Vec<String> {
     let sent = format!("{} {} {}", START_OF_STRING, sentence, END_OF_STRING);
     if self.get_lower_case_config() {
@@ -57,10 +57,57 @@ trait Model {
     .map(|t| t.to_string())
     .collect()
   }
-  
+
   fn save(&self) -> Result<(), String>;
-  
+
   fn load(&mut self) -> Result<(), String>;
+}
+
+trait PreProcessor {
+  fn process(&self, sentence: String) -> Result<String, String>;
+  fn set_next(&mut self, next: Box<dyn PreProcessor>);
+  fn get_next(&self) -> &Option<Box<dyn PreProcessor>>;
+  fn pass(&self, sentence: String) -> Result<String, String> {
+    if let Some(next) = self.get_next() {
+      next.process(sentence)
+    } else {
+      Ok(sentence)
+    }
+  }
+}
+
+struct LowerCasePreProcessor {
+  next: Option<Box<dyn PreProcessor>>,
+}
+impl PreProcessor for LowerCasePreProcessor {
+  fn process(&self, sentence: String) -> Result<String, String> {
+    self.pass(sentence.to_lowercase())
+  }
+
+  fn set_next(&mut self, next: Box<dyn PreProcessor>) {
+    self.next = Some(next);
+  }
+
+  fn get_next(&self) -> &Option<Box<dyn PreProcessor>> {
+    &self.next
+  }
+}
+
+struct StartEndTokensPreProcessor {
+  next : Option<Box<dyn PreProcessor>>,
+}
+impl PreProcessor for StartEndTokensPreProcessor {
+  fn process(&self, sentence: String) -> Result<String, String> {
+    self.pass(format!("{} {} {}", START_OF_STRING, sentence, END_OF_STRING))
+  }
+
+  fn set_next(&mut self, next: Box<dyn PreProcessor>) {
+    self.next = Some(next);
+  }
+
+  fn get_next(&self) -> &Option<Box<dyn PreProcessor>> {
+    &self.next
+  }
 }
 
 pub struct LidstoneModel {
@@ -92,7 +139,10 @@ impl Model for LidstoneModel {
     for sentence in corpus {
       let tokenized_sent = self.tokenize(sentence.clone());
       if tokenized_sent.len() < self.n_size {
-        return Err(format!("Length of sentence is shorter than ngram sizeof {}:\n\"{}\"", self.n_size, sentence));
+        return Err(format!(
+          "Length of sentence is shorter than ngram sizeof {}:\n\"{}\"",
+          self.n_size, sentence
+        ));
       }
       for i in 0..tokenized_sent.len() {
         self.vocabulary.insert(tokenized_sent[i].clone());
