@@ -39,30 +39,6 @@ impl Default for Config {
   }
 }
 
-trait Model {
-  fn train(&mut self, corpus: Vec<String>) -> Result<(), String>;
-
-  fn predict(&mut self);
-
-  fn get_lower_case_config(&self) -> bool;
-
-  fn tokenize(&mut self, sentence: String) -> Vec<String> {
-    let sent = format!("{} {} {}", START_OF_STRING, sentence, END_OF_STRING);
-    if self.get_lower_case_config() {
-      sent.to_lowercase()
-    } else {
-      sent
-    }
-    .split_whitespace()
-    .map(|t| t.to_string())
-    .collect()
-  }
-
-  fn save(&self) -> Result<(), String>;
-
-  fn load(&mut self) -> Result<(), String>;
-}
-
 trait PreProcessor {
   fn process(&self, sentence: String) -> Result<String, String>;
   fn set_next(&mut self, next: Box<dyn PreProcessor>);
@@ -79,6 +55,11 @@ trait PreProcessor {
 struct LowerCasePreProcessor {
   next: Option<Box<dyn PreProcessor>>,
 }
+impl LowerCasePreProcessor {
+  fn new() -> Self {
+    Self { next: None }
+  }
+}
 impl PreProcessor for LowerCasePreProcessor {
   fn process(&self, sentence: String) -> Result<String, String> {
     self.pass(sentence.to_lowercase())
@@ -94,11 +75,19 @@ impl PreProcessor for LowerCasePreProcessor {
 }
 
 struct StartEndTokensPreProcessor {
-  next : Option<Box<dyn PreProcessor>>,
+  next: Option<Box<dyn PreProcessor>>,
+}
+impl StartEndTokensPreProcessor {
+  fn new() -> Self {
+    Self { next: None }
+  }
 }
 impl PreProcessor for StartEndTokensPreProcessor {
   fn process(&self, sentence: String) -> Result<String, String> {
-    self.pass(format!("{} {} {}", START_OF_STRING, sentence, END_OF_STRING))
+    self.pass(format!(
+      "{} {} {}",
+      START_OF_STRING, sentence, END_OF_STRING
+    ))
   }
 
   fn set_next(&mut self, next: Box<dyn PreProcessor>) {
@@ -108,6 +97,22 @@ impl PreProcessor for StartEndTokensPreProcessor {
   fn get_next(&self) -> &Option<Box<dyn PreProcessor>> {
     &self.next
   }
+}
+
+trait Model {
+  fn train(
+    &mut self,
+    pre_processor_chain: Box<dyn PreProcessor>,
+    corpus: Vec<String>,
+  ) -> Result<(), String>;
+
+  fn predict(&mut self);
+
+  fn get_lower_case_config(&self) -> bool;
+
+  fn save(&self) -> Result<(), String>;
+
+  fn load(&mut self) -> Result<(), String>;
 }
 
 pub struct LidstoneModel {
@@ -135,15 +140,25 @@ impl LidstoneModel {
 }
 
 impl Model for LidstoneModel {
-  fn train(&mut self, corpus: Vec<String>) -> Result<(), String> {
+  fn train(
+    &mut self,
+    pre_processor_chain: Box<dyn PreProcessor>,
+    corpus: Vec<String>,
+  ) -> Result<(), String> {
     for sentence in corpus {
-      let tokenized_sent = self.tokenize(sentence.clone());
+      let tokenized_sent = pre_processor_chain
+        .process(sentence.clone())?
+        .split_whitespace()
+        .map(|x| x.to_string())
+        .collect::<Vec<String>>();
+
       if tokenized_sent.len() < self.n_size {
         return Err(format!(
           "Length of sentence is shorter than ngram sizeof {}:\n\"{}\"",
           self.n_size, sentence
         ));
       }
+
       for i in 0..tokenized_sent.len() {
         self.vocabulary.insert(tokenized_sent[i].clone());
       }
@@ -188,4 +203,10 @@ impl Model for LidstoneModel {
 
 fn main() {
   println!("Hello, world!");
+  let config = Config::default();
+  let mut model = LidstoneModel::new(config);
+  let mut first_pp = LowerCasePreProcessor::new();
+  let pp2 = StartEndTokensPreProcessor::new();
+  first_pp.set_next(Box::new(pp2));
+  model.train(Box::new(first_pp), vec!["he".to_string()]).unwrap();
 }
