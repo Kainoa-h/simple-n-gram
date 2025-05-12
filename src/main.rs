@@ -108,8 +108,6 @@ trait Model {
 
   fn predict(&mut self);
 
-  fn get_lower_case_config(&self) -> bool;
-
   fn save(&self) -> Result<(), String>;
 
   fn load(&mut self) -> Result<(), String>;
@@ -154,7 +152,7 @@ impl Model for LidstoneModel {
 
       if tokenized_sent.len() < self.n_size {
         return Err(format!(
-          "Length of sentence is shorter than ngram sizeof {}:\n\"{}\"",
+          "Length of sentence is shorter than ngram size of {}:\n\"{}\"",
           self.n_size, sentence
         ));
       }
@@ -188,10 +186,6 @@ impl Model for LidstoneModel {
     todo!()
   }
 
-  fn get_lower_case_config(&self) -> bool {
-    self.lower_case.to_owned()
-  }
-
   fn save(&self) -> Result<(), String> {
     todo!()
   }
@@ -208,5 +202,7 @@ fn main() {
   let mut first_pp = LowerCasePreProcessor::new();
   let pp2 = StartEndTokensPreProcessor::new();
   first_pp.set_next(Box::new(pp2));
-  model.train(Box::new(first_pp), vec!["he".to_string()]).unwrap();
+  model
+    .train(Box::new(first_pp), vec!["he".to_string()])
+    .unwrap();
 }
