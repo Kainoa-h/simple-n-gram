@@ -122,7 +122,7 @@ pub struct LidstoneModel {
     temperature: f32,
     lower_case: bool,
     vocabulary: HashSet<String>,
-    n_gram_map: HashMap<String, Vec<(String, u32)>>,
+    n_gram_map: HashMap<String, Vec<(String, u32, f64)>>,
 }
 
 impl LidstoneModel {
@@ -151,7 +151,7 @@ impl Model for LidstoneModel {
             let tokenized_sent = pre_processor_chain
                 .process(sentence.to_owned())?
                 .split_whitespace()
-                .map(|x| x.to_string())
+                .map(|x| x.to_owned())
                 .collect::<Vec<String>>();
 
             if tokenized_sent.len() < self.n_size {
@@ -164,22 +164,38 @@ impl Model for LidstoneModel {
             self.vocabulary.extend(tokenized_sent.iter().cloned());
 
             for i in 0..=tokenized_sent.len() - self.n_size {
-                let context_word: String = tokenized_sent[i..i + self.n_size - 1]
+                let ctx_tokens: String = tokenized_sent[i..i + self.n_size - 1]
                     .iter()
                     .map(|w| w.to_string())
                     .collect();
-                let target_word: String = tokenized_sent[i + self.n_size - 1].to_owned();
+                let target_token: String = tokenized_sent[i + self.n_size - 1].to_owned();
 
                 n_gram_map_builder
-                    .entry(context_word.clone())
+                    .entry(ctx_tokens.clone())
                     .and_modify(|x| {
-                        x.entry(target_word.clone())
+                        x.entry(target_token.clone())
                             .and_modify(|y| *y += 1)
                             .or_insert(1);
                     })
-                    .or_insert_with(|| HashMap::from([(target_word.clone(), 1)]));
+                    .or_insert_with(|| HashMap::from([(target_token.clone(), 1)]));
             }
         }
+
+        for (context_token, candidates) in n_gram_map_builder.iter() {
+            let mut candidate_tuples: Vec<(String, u32, f64)> = Vec::new();
+            let mut total: u32 = 0;
+            for (candidate_token, count) in candidates {
+                total += count;
+                candidate_tuples.push((candidate_token.to_owned(), *count, 0.0));
+            }
+            for tup in candidate_tuples.iter_mut() {
+                tup.2 = tup.1 as f64 / total as f64;
+            }
+            candidate_tuples.sort_by(|a, b| b.1.cmp(&a.1));
+            self.n_gram_map
+                .insert(context_token.to_owned(), candidate_tuples);
+        }
+
         Ok(())
     }
 
@@ -187,9 +203,17 @@ impl Model for LidstoneModel {
         todo!()
     }
 
-    //TODO:Write to file
     fn save(&self) -> Result<String, <LidstoneModel as Model>::ModelError> {
-        let model_json = serde_json::to_string(&self.n_gram_map).expect("lol");
+        let simplified: HashMap<String, Vec<(String, u32)>> = self
+            .n_gram_map
+            .iter()
+            .map(|(ctx, vec)| {
+                let candidates = vec.iter().map(|(s, u, _)| (s.clone(), *u)).collect();
+                (ctx.clone(), candidates)
+            })
+            .collect();
+
+        let model_json = serde_json::to_string(&simplified).expect("lol");
         match fs::write("model.json", &model_json) {
             Ok(_) => Ok(model_json),
             Err(err) => Err(format!("File write error: {}", err)),
