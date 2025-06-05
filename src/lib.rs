@@ -4,7 +4,9 @@ Features:
 - <unk> tag for out of vocab words
 - Enum for choosing
 */
+use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
+use rand::{Rng, SeedableRng};
 use std::fs::{self};
 use std::{
     cmp::max,
@@ -22,9 +24,9 @@ enum SmoothingType {
 pub struct Config {
     n_size: usize,
     smoothing_type: SmoothingType,
-    lidstone_alpha: f32,
-    top_k: f32,
-    temperature: f32,
+    lidstone_alpha: f64,
+    top_k: f64,
+    temperature: f64,
     lower_case: bool,
 }
 
@@ -34,7 +36,7 @@ impl Default for Config {
             n_size: 2,
             smoothing_type: SmoothingType::Lidstone,
             lidstone_alpha: 1.0,
-            top_k: 0.8,
+            top_k: 1.0,
             temperature: 1.0,
             lower_case: true,
         }
@@ -108,7 +110,9 @@ pub trait Model {
         &mut self, pre_processor_chain: Box<dyn PreProcessor>, corpus: Vec<&str>,
     ) -> Result<(), String>;
 
-    fn predict(&self, max_tokens: u32);
+    fn generate(&self, max_tokens: u32) -> String;
+
+    fn predict_next_token(&self, context: &str, rng: &mut StdRng) -> &str;
 
     fn save(&self) -> Result<String, <Self as Model>::ModelError>;
 
@@ -117,9 +121,9 @@ pub trait Model {
 
 pub struct LidstoneModel {
     n_size: usize,
-    alpha: f32,
-    top_k: f32,
-    temperature: f32,
+    alpha: f64,
+    top_k: f64,
+    temperature: f64,
     lower_case: bool,
     vocabulary: HashSet<String>, //TODO: not sure what this is for
     n_gram_map: HashMap<String, Vec<(String, u32, f64)>>,
@@ -140,12 +144,6 @@ impl LidstoneModel {
         }
     }
 }
-
-type PredictFn = fn(&mut LidstoneModel);
-
-type PredictFn = fn(&mut LidstoneModel);
-
-type PredictFn = fn(&mut LidstoneModel);
 
 impl Model for LidstoneModel {
     type ModelError = String;
@@ -213,19 +211,66 @@ impl Model for LidstoneModel {
         Ok(())
     }
 
-    fn predict(&self, max_tokens: u32) {
+    fn generate(&self, max_tokens: u32) -> String {
+        let mut rng = StdRng::seed_from_u64(13);
         let mut count: u32 = 0;
-        let output: String = String::new();
+        let mut output: Vec<&str> = Vec::new();
+        let start: &str = &self.start_tokens[rng.random_range(0..self.start_tokens.len())];
+        output.extend(start.split(' '));
+        let next: &str = self.predict_next_token(start, &mut rng);
+        output.push(next);
         loop {
             if max_tokens != 0 && max_tokens == count {
-                return;
+                return output.join(" ");
             };
-            //TODO:randonly find a starting string
+            let sidx = output.len() - self.n_size + 1;
+            let start: &str = &output[sidx..].join(" ");
+            let next: &str = self.predict_next_token(start, &mut rng);
+            output.push(next);
+            if next == END_OF_STRING {
+                return output.join(" ");
+            }
 
             if max_tokens != 0 {
                 count += 1;
             }
         }
+    }
+
+    fn predict_next_token(&self, context: &str, rng: &mut StdRng) -> &str {
+        let candidates = match self.n_gram_map.get(context) {
+            Some(c) => c,
+            None => {
+                return END_OF_STRING;
+            }
+        };
+
+        let rng: f64 = rng.random();
+        if self.top_k < 1.0 {
+            let k_count = max(1, (candidates.len() as f64 * self.top_k) as usize);
+            let shortened = &candidates[..k_count];
+            let mut prob_sum: f64 = 0.0;
+            for c in shortened.iter() {
+                prob_sum += c.2;
+            }
+            let mut rolling_prob: f64 = 0.0;
+            for c in shortened.iter() {
+                rolling_prob += c.2 / prob_sum;
+                if rng < rolling_prob {
+                    return &c.0;
+                }
+            }
+            return &candidates[0].0;
+        }
+
+        let mut rolling_prob = 0.0;
+        for c in candidates.iter() {
+            rolling_prob += c.2;
+            if rng < rolling_prob {
+                return &c.0;
+            }
+        }
+        return &candidates[0].0;
     }
 
     fn save(&self) -> Result<String, <LidstoneModel as Model>::ModelError> {

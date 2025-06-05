@@ -15,8 +15,10 @@ fn main() {
         .build_n_gram(Box::new(first_pp), corpus_vector)
         .unwrap();
 
-    match model.save() {
-        Ok(_) => println!("Model saved!"),
-        Err(err) => println!("{}", err),
-    }
+    println!("Generating tokens...");
+    println!("Done!\n\n{}", model.generate(0));
+    // match model.save() {
+    //     Ok(_) => println!("Model saved!"),
+    //     Err(err) => println!("{}", err),
+    // }
 }
