@@ -108,7 +108,7 @@ pub trait Model {
         &mut self, pre_processor_chain: Box<dyn PreProcessor>, corpus: Vec<&str>,
     ) -> Result<(), String>;
 
-    fn predict(&mut self);
+    fn predict(&self, max_tokens: u32);
 
     fn save(&self) -> Result<String, <Self as Model>::ModelError>;
 
@@ -138,6 +138,12 @@ impl LidstoneModel {
         }
     }
 }
+
+type PredictFn = fn(&mut LidstoneModel);
+
+type PredictFn = fn(&mut LidstoneModel);
+
+type PredictFn = fn(&mut LidstoneModel);
 
 impl Model for LidstoneModel {
     type ModelError = String;
@@ -199,8 +205,19 @@ impl Model for LidstoneModel {
         Ok(())
     }
 
-    fn predict(&mut self) {
-        todo!()
+    fn predict(&self, max_tokens: u32) {
+        let mut count: u32 = 0;
+        let output: String = String::new();
+        loop {
+            if max_tokens != 0 && max_tokens == count {
+                return;
+            };
+            //TODO:randonly find a starting string
+
+            if max_tokens != 0 {
+                count += 1;
+            }
+        }
     }
 
     fn save(&self) -> Result<String, <LidstoneModel as Model>::ModelError> {
