@@ -121,8 +121,9 @@ pub struct LidstoneModel {
     top_k: f32,
     temperature: f32,
     lower_case: bool,
-    vocabulary: HashSet<String>,
+    vocabulary: HashSet<String>, //TODO: not sure what this is for
     n_gram_map: HashMap<String, Vec<(String, u32, f64)>>,
+    start_tokens: Vec<String>,
 }
 
 impl LidstoneModel {
@@ -135,6 +136,7 @@ impl LidstoneModel {
             lower_case: config.lower_case,
             vocabulary: HashSet::new(),
             n_gram_map: HashMap::new(),
+            start_tokens: Vec::new(),
         }
     }
 }
@@ -162,11 +164,17 @@ impl Model for LidstoneModel {
             }
 
             self.vocabulary.extend(tokenized_sent.iter().cloned());
+            self.start_tokens.push(
+                tokenized_sent[0..self.n_size - 1]
+                    .iter()
+                    .map(|w| w.to_owned())
+                    .collect(),
+            );
 
             for i in 0..=tokenized_sent.len() - self.n_size {
                 let ctx_tokens: String = tokenized_sent[i..i + self.n_size - 1]
                     .iter()
-                    .map(|w| w.to_string())
+                    .map(|w| w.to_owned())
                     .collect();
                 let target_token: String = tokenized_sent[i + self.n_size - 1].to_owned();
 
@@ -213,7 +221,9 @@ impl Model for LidstoneModel {
             })
             .collect();
 
-        let model_json = serde_json::to_string(&simplified).expect("lol");
+        let model = (self.start_tokens.clone(), simplified);
+
+        let model_json = serde_json::to_string(&model).expect("lol");
         match fs::write("model.json", &model_json) {
             Ok(_) => Ok(model_json),
             Err(err) => Err(format!("File write error: {}", err)),
