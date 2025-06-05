@@ -1,2 +1,4 @@
 /target
 .idea/
+corpus.txt
+model.json
