@@ -3,6 +3,10 @@ use simple_n_gram::*;
 fn main() {
     println!("Hello, world!");
     let config = Config::default();
+    let config = Config {
+        n_size: 3,
+        ..config
+    };
     let mut model = LidstoneModel::new(config);
     let mut first_pp = LowerCasePreProcessor::new();
     let pp2 = StartEndTokensPreProcessor::new();

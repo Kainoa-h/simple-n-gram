@@ -17,17 +17,17 @@ use std::{
 const START_OF_STRING: &str = "<s>";
 const END_OF_STRING: &str = "<s/>";
 
-enum SmoothingType {
+pub enum SmoothingType {
     Lidstone,
 }
 
 pub struct Config {
-    n_size: usize,
-    smoothing_type: SmoothingType,
-    lidstone_alpha: f64,
-    top_k: f64,
-    temperature: f64,
-    lower_case: bool,
+    pub n_size: usize,
+    pub smoothing_type: SmoothingType,
+    pub lidstone_alpha: f64,
+    pub top_k: f64,
+    pub temperature: f64,
+    pub lower_case: bool,
 }
 
 impl Default for Config {
@@ -153,7 +153,10 @@ impl Model for LidstoneModel {
     ) -> Result<(), String> {
         let mut n_gram_map_builder: HashMap<String, HashMap<String, u32>> = HashMap::new();
 
-        for sentence in corpus {
+        for (idx, &sentence) in corpus.iter().enumerate() {
+            if sentence.is_empty() {
+                continue;
+            };
             let tokenized_sent = pre_processor_chain
                 .process(sentence.to_owned())?
                 .split_whitespace()
@@ -162,8 +165,8 @@ impl Model for LidstoneModel {
 
             if tokenized_sent.len() < self.n_size {
                 return Err(format!(
-                    "Length of sentence is shorter than ngram size of {}:\n\"{}\"",
-                    self.n_size, sentence
+                    "Length of sentence at line {} is shorter than ngram size of {}:\n\"{}\"",
+                    idx, self.n_size, sentence
                 ));
             }
 
@@ -171,15 +174,17 @@ impl Model for LidstoneModel {
             self.start_tokens.push(
                 tokenized_sent[0..self.n_size - 1]
                     .iter()
-                    .map(|w| w.to_owned())
-                    .collect(),
+                    .map(|w| w.as_str())
+                    .collect::<Vec<&str>>()
+                    .join(" "),
             );
 
             for i in 0..=tokenized_sent.len() - self.n_size {
                 let ctx_tokens: String = tokenized_sent[i..i + self.n_size - 1]
                     .iter()
-                    .map(|w| w.to_owned())
-                    .collect();
+                    .map(|w| w.as_str())
+                    .collect::<Vec<&str>>()
+                    .join(" ");
                 let target_token: String = tokenized_sent[i + self.n_size - 1].to_owned();
 
                 n_gram_map_builder
