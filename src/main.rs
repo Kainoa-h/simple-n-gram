@@ -4,7 +4,7 @@ fn main() {
     println!("Hello, world!");
     let config = Config::default();
     let config = Config {
-        n_size: 3,
+        n_size: 2,
         ..config
     };
     let mut model = LidstoneModel::new(config);
@@ -21,6 +21,7 @@ fn main() {
 
     println!("Generating tokens...");
     println!("Done!\n\n{}", model.generate(0));
+    println!("\n\n\n{}", model.generate(0));
     // match model.save() {
     //     Ok(_) => println!("Model saved!"),
     //     Err(err) => println!("{}", err),

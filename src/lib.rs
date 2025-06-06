@@ -208,7 +208,7 @@ impl Model for LidstoneModel {
             for tup in candidate_tuples.iter_mut() {
                 tup.2 = tup.1 as f64 / total as f64;
             }
-            candidate_tuples.sort_by(|a, b| b.1.cmp(&a.1));
+            candidate_tuples.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
             self.n_gram_map
                 .insert(context_token.to_owned(), candidate_tuples);
         }
@@ -217,7 +217,7 @@ impl Model for LidstoneModel {
     }
 
     fn generate(&self, max_tokens: u32) -> String {
-        let mut rng = StdRng::seed_from_u64(13);
+        let mut rng = StdRng::seed_from_u64(54);
         let mut count: u32 = 0;
         let mut output: Vec<&str> = Vec::new();
         let start: &str = &self.start_tokens[rng.random_range(0..self.start_tokens.len())];
@@ -250,7 +250,7 @@ impl Model for LidstoneModel {
             }
         };
 
-        let rng: f64 = rng.random();
+        let rand_float: f64 = rng.random();
         if self.top_k < 1.0 {
             let k_count = max(1, (candidates.len() as f64 * self.top_k) as usize);
             let shortened = &candidates[..k_count];
@@ -261,7 +261,7 @@ impl Model for LidstoneModel {
             let mut rolling_prob: f64 = 0.0;
             for c in shortened.iter() {
                 rolling_prob += c.2 / prob_sum;
-                if rng < rolling_prob {
+                if rand_float < rolling_prob {
                     return &c.0;
                 }
             }
@@ -271,11 +271,11 @@ impl Model for LidstoneModel {
         let mut rolling_prob = 0.0;
         for c in candidates.iter() {
             rolling_prob += c.2;
-            if rng < rolling_prob {
+            if rand_float < rolling_prob {
                 return &c.0;
             }
         }
-        return &candidates[0].0;
+        &candidates[0].0
     }
 
     fn save(&self) -> Result<String, <LidstoneModel as Model>::ModelError> {
