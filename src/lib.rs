@@ -5,13 +5,12 @@ Features:
 - Enum for choosing
 */
 use rand::rngs::StdRng;
-use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
-use std::fs::{self};
+use std::fs::{self, File};
+use std::io::BufReader;
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
-    thread::AccessError,
 };
 
 const START_OF_STRING: &str = "<s>";
@@ -59,6 +58,11 @@ pub trait PreProcessor {
 pub struct LowerCasePreProcessor {
     next: Option<Box<dyn PreProcessor>>,
 }
+impl Default for LowerCasePreProcessor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl LowerCasePreProcessor {
     pub fn new() -> Self {
         Self { next: None }
@@ -80,6 +84,11 @@ impl PreProcessor for LowerCasePreProcessor {
 
 pub struct StartEndTokensPreProcessor {
     next: Option<Box<dyn PreProcessor>>,
+}
+impl Default for StartEndTokensPreProcessor {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 impl StartEndTokensPreProcessor {
     pub fn new() -> Self {
@@ -116,7 +125,7 @@ pub trait Model {
 
     fn save(&self) -> Result<String, <Self as Model>::ModelError>;
 
-    fn load(&mut self) -> Result<(), String>;
+    fn load(&mut self, path: &str) -> Result<(), String>;
 }
 
 pub struct LidstoneModel {
@@ -290,14 +299,44 @@ impl Model for LidstoneModel {
 
         let model = (self.start_tokens.clone(), simplified);
 
-        let model_json = serde_json::to_string(&model).expect("lol");
+        let model_json = serde_json::to_string(&model).expect("lol"); //TODO:Handle error
         match fs::write("model.json", &model_json) {
             Ok(_) => Ok(model_json),
             Err(err) => Err(format!("File write error: {}", err)),
         }
     }
 
-    fn load(&mut self) -> Result<(), String> {
-        todo!()
+    // TODO:Significant refactors needed
+    // - model parameter and type has to be saved in the json
+    // - change load be a constructor?
+    fn load(&mut self, path: &str) -> Result<(), String> {
+        self.n_gram_map = HashMap::new();
+        self.start_tokens = Vec::new();
+        let file = match File::open(path) {
+            Ok(x) => x,
+            Err(e) => return Err(format!("Failed to open file: {}", path)),
+        };
+        let reader = BufReader::new(file);
+        let model_parsed: (Vec<String>, HashMap<String, Vec<(String, u32)>>) =
+            match serde_json::from_reader(reader) {
+                Ok(x) => x,
+                Err(_) => return Err("Failed to parse model json file".to_owned()),
+            };
+        self.start_tokens = model_parsed.0;
+        let model_shot = model_parsed.1;
+        self.n_gram_map = model_shot
+            .iter()
+            .map(|(ctx, vec)| {
+                let candidates = vec
+                    .iter()
+                    .map(|(s, u)| (s.clone(), *u, *u as f64 / vec.len() as f64))
+                    .collect();
+                (ctx.to_owned(), candidates)
+            })
+            .collect();
+
+        println!("{}", serde_json::to_string(&self.n_gram_map).expect("lol")); //TODO:Handle error
+
+        Ok(())
     }
 }
