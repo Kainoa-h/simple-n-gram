@@ -19,9 +19,20 @@ fn main() {
         .build_n_gram(Box::new(first_pp), corpus_vector)
         .unwrap();
 
-    println!("Generating tokens...");
-    println!("Done!\n\n{}", model.generate(0));
-    println!("\n\n\n{}", model.generate(0));
+    println!("Ready!");
+
+    loop {
+        println!("\n\nEnter a seed:");
+        let mut line = String::new();
+        std::io::stdin().read_line(&mut line).expect("AAHH");
+        let value: String = line.parse().expect("OI");
+        let value: &str = value.trim();
+
+        println!("\n\n\n{}", model.generate(0, value.parse().expect("numba")));
+    }
+
+    // println!("Done!\n\n{}", model.generate(0));
+    // println!("\n\n\n{}", model.generate(0));
     // match model.save() {
     //     Ok(_) => println!("Model saved!"),
     //     Err(err) => println!("{}", err),

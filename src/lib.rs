@@ -110,7 +110,7 @@ pub trait Model {
         &mut self, pre_processor_chain: Box<dyn PreProcessor>, corpus: Vec<&str>,
     ) -> Result<(), String>;
 
-    fn generate(&self, max_tokens: u32) -> String;
+    fn generate(&self, max_tokens: u32, seed: u64) -> String;
 
     fn predict_next_token(&self, context: &str, rng: &mut StdRng) -> &str;
 
@@ -216,8 +216,8 @@ impl Model for LidstoneModel {
         Ok(())
     }
 
-    fn generate(&self, max_tokens: u32) -> String {
-        let mut rng = StdRng::seed_from_u64(54);
+    fn generate(&self, max_tokens: u32, seed: u64) -> String {
+        let mut rng = StdRng::seed_from_u64(seed);
         let mut count: u32 = 0;
         let mut output: Vec<&str> = Vec::new();
         let start: &str = &self.start_tokens[rng.random_range(0..self.start_tokens.len())];
