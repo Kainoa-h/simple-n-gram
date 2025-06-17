@@ -306,7 +306,7 @@ impl Model for LidstoneModel {
         }
     }
 
-    // TODO:Significant refactors needed
+    //TODO:Significant refactors needed
     // - model parameter and type has to be saved in the json
     // - change load be a constructor?
     fn load(&mut self, path: &str) -> Result<(), String> {
