@@ -6,6 +6,7 @@ Features:
 */
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
+use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::BufReader;
 use std::{
@@ -128,6 +129,7 @@ pub trait Model {
     fn load(&mut self, path: &str) -> Result<(), String>;
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct LidstoneModel {
     n_size: usize,
     alpha: f64,
