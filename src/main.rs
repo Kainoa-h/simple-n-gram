@@ -3,8 +3,7 @@ use simple_n_gram::*;
 fn main() {
     println!("Hello, world!");
 
-    let mut model = LidstoneModel::new(Config::default());
-    model.load("model.json");
+    let model_from_file = LidstoneModel::load("model.json").expect("lol");
 
     // let config = Config::default();
     // let config = Config {
@@ -22,10 +21,11 @@ fn main() {
     // model
     //     .build_n_gram(Box::new(first_pp), corpus_vector)
     //     .unwrap();
-
-    println!("Generating tokens...");
-    println!("Done!\n\n{}", model.generate(0));
-    println!("\n\n\n{}", model.generate(0));
+    //
+    // println!("Generating tokens...");
+    // println!("Model:\n\n{}", model.generate(0));
+    println!("Model from file:\n\n{}", model_from_file.generate(0));
+    println!("Model from file:\n\n{}", model_from_file.generate(0));
     // match model.save() {
     //     Ok(_) => println!("Model saved!"),
     //     Err(err) => println!("{}", err),

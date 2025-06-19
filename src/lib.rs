@@ -6,7 +6,8 @@ Features:
 */
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
 use std::fs::{self, File};
 use std::io::BufReader;
 use std::{
@@ -113,7 +114,7 @@ impl PreProcessor for StartEndTokensPreProcessor {
     }
 }
 
-pub trait Model {
+pub trait Model: Sized {
     type ModelError;
 
     fn build_n_gram(
@@ -126,7 +127,7 @@ pub trait Model {
 
     fn save(&self) -> Result<String, <Self as Model>::ModelError>;
 
-    fn load(&mut self, path: &str) -> Result<(), String>;
+    fn load(path: &str) -> Result<Self, String>;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -137,8 +138,26 @@ pub struct LidstoneModel {
     temperature: f64,
     lower_case: bool,
     vocabulary: HashSet<String>, //TODO: not sure what this is for
+    #[serde(serialize_with = "serialize_n_gram_map")]
     n_gram_map: HashMap<String, Vec<(String, u32, f64)>>,
     start_tokens: Vec<String>,
+}
+
+fn serialize_n_gram_map<S>(
+    map: &HashMap<String, Vec<(String, u32, f64)>>, serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut s_map = serializer.serialize_map(Some(map.len()))?;
+    for (key, vec_of_tuples) in map {
+        let mut temp_vec = Vec::new();
+        for (s, u, _) in vec_of_tuples {
+            temp_vec.push((s, u, 0.0f64));
+        }
+        s_map.serialize_entry(key, &temp_vec)?;
+    }
+    s_map.end()
 }
 
 impl LidstoneModel {
@@ -228,7 +247,7 @@ impl Model for LidstoneModel {
     }
 
     fn generate(&self, max_tokens: u32) -> String {
-        let mut rng = StdRng::seed_from_u64(54);
+        let mut rng = StdRng::seed_from_u64(345);
         let mut count: u32 = 0;
         let mut output: Vec<&str> = Vec::new();
         let start: &str = &self.start_tokens[rng.random_range(0..self.start_tokens.len())];
@@ -290,55 +309,32 @@ impl Model for LidstoneModel {
     }
 
     fn save(&self) -> Result<String, <LidstoneModel as Model>::ModelError> {
-        let simplified: HashMap<String, Vec<(String, u32)>> = self
-            .n_gram_map
-            .iter()
-            .map(|(ctx, vec)| {
-                let candidates = vec.iter().map(|(s, u, _)| (s.clone(), *u)).collect();
-                (ctx.clone(), candidates)
-            })
-            .collect();
-
-        let model = (self.start_tokens.clone(), simplified);
-
-        let model_json = serde_json::to_string(&model).expect("lol"); //TODO:Handle error
+        let model_json = serde_json::to_string(&self).expect("lol"); //TODO:Handle error
         match fs::write("model.json", &model_json) {
             Ok(_) => Ok(model_json),
             Err(err) => Err(format!("File write error: {}", err)),
         }
     }
 
-    //TODO:Significant refactors needed
-    // - model parameter and type has to be saved in the json
-    // - change load be a constructor?
-    fn load(&mut self, path: &str) -> Result<(), String> {
-        self.n_gram_map = HashMap::new();
-        self.start_tokens = Vec::new();
+    fn load(path: &str) -> Result<LidstoneModel, String> {
         let file = match File::open(path) {
             Ok(x) => x,
-            Err(e) => return Err(format!("Failed to open file: {}", path)),
+            Err(_) => return Err(format!("Failed to open file: {}", path)),
         };
         let reader = BufReader::new(file);
-        let model_parsed: (Vec<String>, HashMap<String, Vec<(String, u32)>>) =
-            match serde_json::from_reader(reader) {
-                Ok(x) => x,
-                Err(_) => return Err("Failed to parse model json file".to_owned()),
-            };
-        self.start_tokens = model_parsed.0;
-        let model_shot = model_parsed.1;
-        self.n_gram_map = model_shot
-            .iter()
-            .map(|(ctx, vec)| {
-                let candidates = vec
-                    .iter()
-                    .map(|(s, u)| (s.clone(), *u, *u as f64 / vec.len() as f64))
-                    .collect();
-                (ctx.to_owned(), candidates)
-            })
-            .collect();
 
-        println!("{}", serde_json::to_string(&self.n_gram_map).expect("lol")); //TODO:Handle error
+        let mut model_parsed: LidstoneModel = match serde_json::from_reader(reader) {
+            Ok(x) => x,
+            Err(_) => return Err("Failed to parse the model file".to_owned()),
+        };
 
-        Ok(())
+        model_parsed.n_gram_map.iter_mut().for_each(|(_ctx, vec)| {
+            let len = vec.len() as f64;
+            vec.iter_mut().for_each(|(_s, u, f)| {
+                *f = *u as f64 / len;
+            });
+        });
+
+        Ok(model_parsed)
     }
 }
