@@ -24,8 +24,27 @@ fn main() {
     //
     // println!("Generating tokens...");
     // println!("Model:\n\n{}", model.generate(0));
-    println!("Model from file:\n\n{}", model_from_file.generate(0));
-    println!("Model from file:\n\n{}", model_from_file.generate(0));
+    let seed = 2314235;
+    println!("Model from file:\n\n{}", model_from_file.generate(0, seed));
+    println!("Model from file:\n\n{}", model_from_file.generate(0, seed));
+
+    println!("Ready!");
+
+    loop {
+        println!("\n\nEnter a seed:");
+        let mut line = String::new();
+        std::io::stdin().read_line(&mut line).expect("AAHH");
+        let value: String = line.parse().expect("OI");
+        let value: &str = value.trim();
+
+        println!(
+            "\n\n\n{}",
+            model_from_file.generate(0, value.parse().expect("numba"))
+        );
+    }
+
+    // println!("Done!\n\n{}", model.generate(0));
+    // println!("\n\n\n{}", model.generate(0));
     // match model.save() {
     //     Ok(_) => println!("Model saved!"),
     //     Err(err) => println!("{}", err),
