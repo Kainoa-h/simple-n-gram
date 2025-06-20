@@ -4,6 +4,7 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::fs::{self, File};
 use std::io::BufReader;
+use std::num;
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
@@ -11,7 +12,6 @@ use std::{
 
 pub struct LidstoneConfig {
     pub n_size: usize,
-    pub lidstone_alpha: f64,
     pub top_k: f64,
     pub temperature: f64,
 }
@@ -20,7 +20,6 @@ impl Default for LidstoneConfig {
     fn default() -> Self {
         Self {
             n_size: 2,
-            lidstone_alpha: 1.0,
             top_k: 1.0,
             temperature: 1.0,
         }
@@ -30,7 +29,6 @@ impl Default for LidstoneConfig {
 #[derive(Serialize, Deserialize)]
 pub struct LidstoneModel {
     n_size: usize,
-    alpha: f64,
     top_k: f64,
     temperature: f64,
     vocabulary_array: Vec<String>,
@@ -60,7 +58,6 @@ impl LidstoneModel {
     pub fn new(config: LidstoneConfig) -> Self {
         Self {
             n_size: config.n_size,
-            alpha: config.lidstone_alpha,
             top_k: config.top_k,
             temperature: config.temperature,
             vocabulary_array: Vec::new(),
@@ -184,9 +181,30 @@ impl Model for LidstoneModel {
         };
 
         let rand_float: f64 = rng.random();
+
+        if self.top_k < 1.0 && self.temperature != 1.0 {
+            let one_over_temp = 1f64 / self.temperature;
+            let k_count = max(1, (candidates.len() as f64 * self.top_k) as usize);
+            let shortened = &candidates[..k_count];
+
+            let mut prob_sum: f64 = 0.0;
+            for c in shortened.iter() {
+                prob_sum += c.2.powf(one_over_temp);
+            }
+            let mut rolling_prob: f64 = 0.0;
+            for c in shortened.iter() {
+                rolling_prob += c.2.powf(one_over_temp) / prob_sum;
+                if rand_float < rolling_prob {
+                    return &c.0;
+                }
+            }
+            return &candidates[0].0;
+        }
+
         if self.top_k < 1.0 {
             let k_count = max(1, (candidates.len() as f64 * self.top_k) as usize);
             let shortened = &candidates[..k_count];
+
             let mut prob_sum: f64 = 0.0;
             for c in shortened.iter() {
                 prob_sum += c.2;
