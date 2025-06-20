@@ -1,4 +1,4 @@
-use crate::{END_OF_STRING, Model, PreProcessor};
+use crate::{END_OF_STRING, Model};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
@@ -73,9 +73,10 @@ impl LidstoneModel {
 impl Model for LidstoneModel {
     type ModelError = String;
 
-    fn build_n_gram(
-        &mut self, pre_processor_chain: Box<dyn PreProcessor>, corpus: Vec<&str>,
-    ) -> Result<(), String> {
+    fn build_n_gram<P>(&mut self, pre_processor_chain: P, corpus: Vec<&str>) -> Result<(), String>
+    where
+        P: Fn(String) -> String,
+    {
         let mut n_gram_map_builder: HashMap<String, HashMap<String, u32>> = HashMap::new();
         let mut vocab_set: HashSet<String> = HashSet::new();
 
@@ -83,8 +84,8 @@ impl Model for LidstoneModel {
             if sentence.is_empty() {
                 continue;
             };
-            let tokenized_sent = pre_processor_chain
-                .process(sentence.to_owned())?
+            //TODO:Lots of copying here...
+            let tokenized_sent = pre_processor_chain(sentence.to_owned())
                 .split_whitespace()
                 .map(|x| x.to_owned())
                 .collect::<Vec<String>>();

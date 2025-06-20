@@ -32,16 +32,21 @@ fn main() {
                     ..config
                 };
                 model = LidstoneModel::new(config);
-                let mut first_pp = LowerCasePreProcessor::new();
-                let pp2 = StartEndTokensPreProcessor::new();
-                first_pp.set_next(Box::new(pp2));
 
                 let raw_corpus: String =
                     std::fs::read_to_string(DEFUALT_CORPUS_PATH).expect("Failed to read corpus");
                 let corpus_vector = raw_corpus.split("\n").collect::<Vec<&str>>();
 
                 model
-                    .build_n_gram(Box::new(first_pp), corpus_vector)
+                    .build_n_gram(
+                        |x| -> String {
+                            PreProcessor::new(x)
+                                .lowercase()
+                                .add_start_end_tokens()
+                                .done()
+                        },
+                        corpus_vector,
+                    )
                     .expect("Model failed to build");
                 break;
             }

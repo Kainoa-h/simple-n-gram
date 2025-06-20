@@ -3,10 +3,9 @@ use rand::rngs::StdRng;
 pub trait Model: Sized {
     type ModelError;
 
-    fn build_n_gram(
-        &mut self, pre_processor_chain: Box<dyn crate::preprocessor::PreProcessor>,
-        corpus: Vec<&str>,
-    ) -> Result<(), String>;
+    fn build_n_gram<P>(&mut self, pre_processor_chain: P, corpus: Vec<&str>) -> Result<(), String>
+    where
+        P: Fn(String) -> String;
 
     fn generate(&self, max_tokens: u32, seed: u64) -> String;
 
