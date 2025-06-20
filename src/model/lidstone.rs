@@ -4,7 +4,6 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::fs::{self, File};
 use std::io::BufReader;
-use std::num;
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
@@ -158,6 +157,7 @@ impl Model for LidstoneModel {
             if max_tokens != 0 && max_tokens == count {
                 return output.join(" ");
             };
+            assert!(output.len() >= self.n_size - 1);
             let sidx = output.len() - self.n_size + 1;
             let start: &str = &output[sidx..].join(" ");
             let next: &str = self.predict_next_token(start, &mut rng);
@@ -172,8 +172,9 @@ impl Model for LidstoneModel {
         }
     }
 
+    //TODO: optimize? pow caching!
     fn predict_next_token(&self, context: &str, rng: &mut StdRng) -> &str {
-        let candidates = match self.n_gram_map.get(context) {
+        let candidates: &Vec<(String, u32, f64)> = match self.n_gram_map.get(context) {
             Some(c) => c,
             None => {
                 return &self.vocabulary_array[rng.random_range(0..self.start_tokens.len())];
@@ -182,46 +183,17 @@ impl Model for LidstoneModel {
 
         let rand_float: f64 = rng.random();
 
-        if self.top_k < 1.0 && self.temperature != 1.0 {
-            let one_over_temp = 1f64 / self.temperature;
-            let k_count = max(1, (candidates.len() as f64 * self.top_k) as usize);
-            let shortened = &candidates[..k_count];
+        let one_over_temp = 1f64 / self.temperature;
+        let k_count = max(1, (candidates.len() as f64 * self.top_k) as usize);
+        let shortened = &candidates[..k_count];
 
-            let mut prob_sum: f64 = 0.0;
-            for c in shortened.iter() {
-                prob_sum += c.2.powf(one_over_temp);
-            }
-            let mut rolling_prob: f64 = 0.0;
-            for c in shortened.iter() {
-                rolling_prob += c.2.powf(one_over_temp) / prob_sum;
-                if rand_float < rolling_prob {
-                    return &c.0;
-                }
-            }
-            return &candidates[0].0;
+        let mut prob_sum: f64 = 0.0;
+        for c in shortened.iter() {
+            prob_sum += c.2.powf(one_over_temp);
         }
-
-        if self.top_k < 1.0 {
-            let k_count = max(1, (candidates.len() as f64 * self.top_k) as usize);
-            let shortened = &candidates[..k_count];
-
-            let mut prob_sum: f64 = 0.0;
-            for c in shortened.iter() {
-                prob_sum += c.2;
-            }
-            let mut rolling_prob: f64 = 0.0;
-            for c in shortened.iter() {
-                rolling_prob += c.2 / prob_sum;
-                if rand_float < rolling_prob {
-                    return &c.0;
-                }
-            }
-            return &candidates[0].0;
-        }
-
-        let mut rolling_prob = 0.0;
-        for c in candidates.iter() {
-            rolling_prob += c.2;
+        let mut rolling_prob: f64 = 0.0;
+        for c in shortened.iter() {
+            rolling_prob += c.2.powf(one_over_temp) / prob_sum;
             if rand_float < rolling_prob {
                 return &c.0;
             }
