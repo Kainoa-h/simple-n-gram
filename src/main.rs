@@ -5,8 +5,8 @@ fn main() {
 
     let model = LidstoneModel::load("model.json").expect("lol");
 
-    // let config = Config::default();
-    // let config = Config {
+    // let config = LidstoneConfig::default();
+    // let config = LidstoneConfig {
     //     n_size: 2,
     //     ..config
     // };
@@ -43,8 +43,6 @@ fn main() {
         println!("\n\n\n{}", model.generate(0, value.parse().expect("numba")));
     }
 
-    // println!("Done!\n\n{}", model.generate(0));
-    // println!("\n\n\n{}", model.generate(0));
     // match model.save() {
     //     Ok(_) => println!("Model saved!"),
     //     Err(err) => println!("{}", err),
