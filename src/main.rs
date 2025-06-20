@@ -3,7 +3,7 @@ use simple_n_gram::*;
 fn main() {
     println!("Hello, world!");
 
-    let model_from_file = LidstoneModel::load("model.json").expect("lol");
+    let model = LidstoneModel::load("model.json").expect("lol");
 
     // let config = Config::default();
     // let config = Config {
@@ -23,10 +23,10 @@ fn main() {
     //     .unwrap();
     //
     // println!("Generating tokens...");
-    // println!("Model:\n\n{}", model.generate(0));
+    //
     let seed = 2314235;
-    println!("Model from file:\n\n{}", model_from_file.generate(0, seed));
-    println!("Model from file:\n\n{}", model_from_file.generate(0, seed));
+    println!("Model from file:\n\n{}", model.generate(0, seed));
+    println!("Model from file:\n\n{}", model.generate(0, seed));
 
     println!("Ready!");
 
@@ -36,11 +36,11 @@ fn main() {
         std::io::stdin().read_line(&mut line).expect("AAHH");
         let value: String = line.parse().expect("OI");
         let value: &str = value.trim();
+        if value == "0" {
+            break;
+        }
 
-        println!(
-            "\n\n\n{}",
-            model_from_file.generate(0, value.parse().expect("numba"))
-        );
+        println!("\n\n\n{}", model.generate(0, value.parse().expect("numba")));
     }
 
     // println!("Done!\n\n{}", model.generate(0));

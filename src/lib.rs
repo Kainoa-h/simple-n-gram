@@ -18,28 +18,20 @@ use std::{
 const START_OF_STRING: &str = "<s>";
 const END_OF_STRING: &str = "<s/>";
 
-pub enum SmoothingType {
-    Lidstone,
-}
-
 pub struct Config {
     pub n_size: usize,
-    pub smoothing_type: SmoothingType,
     pub lidstone_alpha: f64,
     pub top_k: f64,
     pub temperature: f64,
-    pub lower_case: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             n_size: 2,
-            smoothing_type: SmoothingType::Lidstone,
             lidstone_alpha: 1.0,
             top_k: 1.0,
             temperature: 1.0,
-            lower_case: true,
         }
     }
 }
@@ -136,8 +128,7 @@ pub struct LidstoneModel {
     alpha: f64,
     top_k: f64,
     temperature: f64,
-    lower_case: bool,
-    vocabulary: HashSet<String>, //TODO: not sure what this is for
+    vocabulary_array: Vec<String>, //TODO figure out how to not need this
     #[serde(serialize_with = "serialize_n_gram_map")]
     n_gram_map: HashMap<String, Vec<(String, u32, f64)>>,
     start_tokens: Vec<String>,
@@ -167,8 +158,7 @@ impl LidstoneModel {
             alpha: config.lidstone_alpha,
             top_k: config.top_k,
             temperature: config.temperature,
-            lower_case: config.lower_case,
-            vocabulary: HashSet::new(),
+            vocabulary_array: Vec::new(),
             n_gram_map: HashMap::new(),
             start_tokens: Vec::new(),
         }
@@ -182,6 +172,7 @@ impl Model for LidstoneModel {
         &mut self, pre_processor_chain: Box<dyn PreProcessor>, corpus: Vec<&str>,
     ) -> Result<(), String> {
         let mut n_gram_map_builder: HashMap<String, HashMap<String, u32>> = HashMap::new();
+        let mut vocab_set: HashSet<String> = HashSet::new();
 
         for (idx, &sentence) in corpus.iter().enumerate() {
             if sentence.is_empty() {
@@ -200,7 +191,7 @@ impl Model for LidstoneModel {
                 ));
             }
 
-            self.vocabulary.extend(tokenized_sent.iter().cloned());
+            vocab_set.extend(tokenized_sent.iter().cloned());
             self.start_tokens.push(
                 tokenized_sent[0..self.n_size - 1]
                     .iter()
@@ -242,6 +233,12 @@ impl Model for LidstoneModel {
             self.n_gram_map
                 .insert(context_token.to_owned(), candidate_tuples);
         }
+        //TODO: is there a way to do this without having to copy the string?
+        self.vocabulary_array = vocab_set
+            .iter()
+            .map(|x| x.to_owned())
+            .collect::<Vec<String>>();
+        self.vocabulary_array.sort();
 
         Ok(())
     }
@@ -276,7 +273,7 @@ impl Model for LidstoneModel {
         let candidates = match self.n_gram_map.get(context) {
             Some(c) => c,
             None => {
-                return END_OF_STRING;
+                return &self.vocabulary_array[rng.random_range(0..self.start_tokens.len())];
             }
         };
 
