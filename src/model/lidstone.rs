@@ -33,7 +33,7 @@ pub struct LidstoneModel {
     alpha: f64,
     top_k: f64,
     temperature: f64,
-    vocabulary_array: Vec<String>, //TODO figure out how to not need this
+    vocabulary_array: Vec<String>,
     #[serde(serialize_with = "serialize_n_gram_map")]
     n_gram_map: HashMap<String, Vec<(String, u32, f64)>>,
     start_tokens: Vec<String>,
@@ -231,9 +231,9 @@ impl Model for LidstoneModel {
         };
 
         model_parsed.n_gram_map.iter_mut().for_each(|(_ctx, vec)| {
-            let len = vec.len() as f64;
+            let total: f64 = vec.iter().map(|x| x.1).sum::<u32>() as f64;
             vec.iter_mut().for_each(|(_s, u, f)| {
-                *f = *u as f64 / len;
+                *f = *u as f64 / total;
             });
         });
 
