@@ -7,9 +7,11 @@ pub trait Model: Sized {
     where
         P: Fn(String) -> String;
 
-    fn generate(&self, max_tokens: u32, seed: u64) -> String;
+    fn generate(&self, max_tokens: u32, seed: u64, top_k: f64, temperature: f64) -> String;
 
-    fn predict_next_token(&self, context: &str, rng: &mut StdRng) -> &str;
+    fn predict_next_token(
+        &self, context: &str, rng: &mut StdRng, top_k: f64, temperature: f64,
+    ) -> &str;
 
     fn save(&self) -> Result<String, Self::ModelError>;
 

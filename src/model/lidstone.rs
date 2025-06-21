@@ -11,25 +11,17 @@ use std::{
 
 pub struct LidstoneConfig {
     pub n_size: usize,
-    pub top_k: f64,
-    pub temperature: f64,
 }
 
 impl Default for LidstoneConfig {
     fn default() -> Self {
-        Self {
-            n_size: 2,
-            top_k: 1.0,
-            temperature: 1.0,
-        }
+        Self { n_size: 2 }
     }
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct LidstoneModel {
     n_size: usize,
-    top_k: f64,
-    temperature: f64,
     vocabulary_array: Vec<String>,
     #[serde(serialize_with = "serialize_n_gram_map")]
     n_gram_map: HashMap<String, Vec<(String, u32, f64)>>,
@@ -57,8 +49,6 @@ impl LidstoneModel {
     pub fn new(config: LidstoneConfig) -> Self {
         Self {
             n_size: config.n_size,
-            top_k: config.top_k,
-            temperature: config.temperature,
             vocabulary_array: Vec::new(),
             n_gram_map: HashMap::new(),
             start_tokens: Vec::new(),
@@ -145,13 +135,13 @@ impl Model for LidstoneModel {
         Ok(())
     }
 
-    fn generate(&self, max_tokens: u32, seed: u64) -> String {
+    fn generate(&self, max_tokens: u32, seed: u64, top_k: f64, temperature: f64) -> String {
         let mut rng = StdRng::seed_from_u64(seed);
         let mut count: u32 = 0;
         let mut output: Vec<&str> = Vec::new();
         let start: &str = &self.start_tokens[rng.random_range(0..self.start_tokens.len())];
         output.extend(start.split(' '));
-        let next: &str = self.predict_next_token(start, &mut rng);
+        let next: &str = self.predict_next_token(start, &mut rng, top_k, temperature);
         output.push(next);
         loop {
             if max_tokens != 0 && max_tokens == count {
@@ -160,7 +150,7 @@ impl Model for LidstoneModel {
             assert!(output.len() >= self.n_size - 1);
             let sidx = output.len() - self.n_size + 1;
             let start: &str = &output[sidx..].join(" ");
-            let next: &str = self.predict_next_token(start, &mut rng);
+            let next: &str = self.predict_next_token(start, &mut rng, top_k, temperature);
             output.push(next);
             if next == END_OF_STRING {
                 return output.join(" ");
@@ -173,7 +163,9 @@ impl Model for LidstoneModel {
     }
 
     //TODO: optimize? pow caching!
-    fn predict_next_token(&self, context: &str, rng: &mut StdRng) -> &str {
+    fn predict_next_token(
+        &self, context: &str, rng: &mut StdRng, top_k: f64, temperature: f64,
+    ) -> &str {
         let candidates: &Vec<(String, u32, f64)> = match self.n_gram_map.get(context) {
             Some(c) => c,
             None => {
@@ -183,8 +175,8 @@ impl Model for LidstoneModel {
 
         let rand_float: f64 = rng.random();
 
-        let one_over_temp = 1f64 / self.temperature;
-        let k_count = max(1, (candidates.len() as f64 * self.top_k) as usize);
+        let one_over_temp = 1f64 / temperature;
+        let k_count = max(1, (candidates.len() as f64 * top_k) as usize);
         let shortened = &candidates[..k_count];
 
         let mut prob_sum: f64 = 0.0;

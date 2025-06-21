@@ -3,6 +3,8 @@ use simple_n_gram::*;
 fn main() {
     const DEFAULT_MODEL_PATH: &str = "model.json";
     const DEFUALT_CORPUS_PATH: &str = "corpus.txt";
+    const MODEL_TEMP: f64 = 1.0;
+    const MODEL_TOP_K: f64 = 1.0;
     let mut model: LidstoneModel;
 
     //init
@@ -26,11 +28,7 @@ fn main() {
                 break;
             }
             "2" => {
-                let config = LidstoneConfig::default();
-                let config = LidstoneConfig {
-                    n_size: 2,
-                    ..config
-                };
+                let config = LidstoneConfig { n_size: 3 };
                 model = LidstoneModel::new(config);
 
                 let raw_corpus: String =
@@ -68,7 +66,10 @@ fn main() {
             break;
         }
 
-        println!("\n\n\n{}", model.generate(0, value.parse().expect("numba")));
+        println!(
+            "\n\n\n{}",
+            model.generate(0, value.parse().expect("numba"), MODEL_TOP_K, MODEL_TEMP)
+        );
     }
 
     println!("Save model? (y/n):");
