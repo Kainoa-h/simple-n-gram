@@ -193,8 +193,10 @@ impl Model for LidstoneModel {
         &candidates[0].0
     }
 
+    //TODO: Allow path specification
     fn save(&self) -> Result<String, <LidstoneModel as Model>::ModelError> {
-        let model_json = serde_json::to_string(&self).expect("lol"); //TODO:Handle error
+        //TODO:Handle error
+        let model_json = serde_json::to_string(&self).expect("lol");
         match fs::write("model.json", &model_json) {
             Ok(_) => Ok(model_json),
             Err(err) => Err(format!("File write error: {}", err)),
