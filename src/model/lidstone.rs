@@ -57,12 +57,12 @@ impl LidstoneModel {
 }
 
 impl Model for LidstoneModel {
+    //FIX:wtf is this
     type ModelError = String;
 
-    fn build_n_gram<P>(&mut self, pre_processor_chain: P, corpus: Vec<&str>) -> Result<(), String>
-    where
-        P: Fn(String) -> String,
-    {
+    fn build_n_gram(
+        &mut self, pre_processor_chain: impl Fn(String) -> String, corpus: Vec<&str>,
+    ) -> Result<(), String> {
         let mut n_gram_map_builder: HashMap<String, HashMap<String, u32>> = HashMap::new();
         let mut vocab_set: HashSet<String> = HashSet::new();
 

@@ -37,8 +37,8 @@ fn main() {
 
                 model
                     .build_n_gram(
-                        |x| -> String {
-                            PreProcessor::new(x)
+                        |s| {
+                            PreProcessor::new(s)
                                 .lowercase()
                                 .add_start_end_tokens()
                                 .done()
